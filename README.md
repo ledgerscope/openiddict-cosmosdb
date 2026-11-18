@@ -38,6 +38,10 @@ The stores don't create containers. Create one container per entity type, **part
 
 The default indexing policy (index all paths) is sufficient.
 
+## Migrating from Azure Table Storage
+
+The [ATS migration script](tools/migrate-ats/README.md) copies applications, scopes, authorizations and tokens from [ledgerscope/openiddict-ats](https://github.com/ledgerscope/openiddict-ats) to the containers above. It validates without writing by default.
+
 ## Design notes
 
 - **Serialization**: documents are always read and written through the SDK's stream APIs using System.Text.Json with
