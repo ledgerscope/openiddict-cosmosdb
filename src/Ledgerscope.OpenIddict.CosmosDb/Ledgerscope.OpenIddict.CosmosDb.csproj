@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Azure Cosmos DB (NoSQL API) stores for OpenIddict 7.x.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ledgerscope.OpenIddict.CosmosDb.Models\Ledgerscope.OpenIddict.CosmosDb.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Note: the Azure Cosmos DB SDK doesn't declare a dependency on Newtonsoft.Json but requires it at runtime
+      (it's used by its default serializer and by its LINQ provider) and fails the build when it's not
+      explicitly referenced. To ensure a non-vulnerable version is used, the package is explicitly referenced.
+    -->
+
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="OpenIddict.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.Net" />
+    <Using Include="System.Text.Json" />
+    <Using Include="Microsoft.Azure.Cosmos" />
+    <Using Include="Microsoft.Azure.Cosmos.Linq" />
+    <Using Include="OpenIddict.Abstractions" />
+    <Using Include="OpenIddict.Abstractions.OpenIddictConstants" Static="true" />
+    <Using Include="OpenIddict.Abstractions.OpenIddictResources" Alias="SR" />
+  </ItemGroup>
+
+</Project>

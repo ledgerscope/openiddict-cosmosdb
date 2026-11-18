@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="NuGet.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Ledgerscope.OpenIddict.CosmosDb.Models/Ledgerscope.OpenIddict.CosmosDb.Models.csproj" />
+    <Project Path="src/Ledgerscope.OpenIddict.CosmosDb/Ledgerscope.OpenIddict.CosmosDb.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Ledgerscope.OpenIddict.CosmosDb.Tests/Ledgerscope.OpenIddict.CosmosDb.Tests.csproj" />
+  </Folder>
+</Solution>
