@@ -1,2 +1,0 @@
-azure-cosmos==4.17.1
-azure-data-tables==12.7.0
