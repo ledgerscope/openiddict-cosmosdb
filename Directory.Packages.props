@@ -6,6 +6,8 @@
   -->
 
   <ItemGroup Label="Library dependencies">
+    <PackageVersion Include="Azure.Data.Tables"                         Version="12.11.0"     />
+    <PackageVersion Include="Azure.Identity"                            Version="1.21.0"      />
     <PackageVersion Include="Microsoft.Azure.Cosmos"                    Version="3.64.0"      />
     <PackageVersion Include="Newtonsoft.Json"                           Version="13.0.4"      />
     <PackageVersion Include="OpenIddict.Core"                           Version="7.5.0"       />

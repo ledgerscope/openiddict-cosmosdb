@@ -40,7 +40,7 @@ The default indexing policy (index all paths) is sufficient.
 
 ## Migrating from Azure Table Storage
 
-The [ATS migration script](tools/migrate-ats/README.md) copies applications, scopes, authorizations and tokens from [ledgerscope/openiddict-ats](https://github.com/ledgerscope/openiddict-ats) to the containers above. It validates without writing by default.
+The [ATS migration tool](tools/migrate-ats-csharp/README.md) copies applications, scopes, authorizations and tokens from [ledgerscope/openiddict-ats](https://github.com/ledgerscope/openiddict-ats) to the containers above. It validates without writing by default.
 
 ## Design notes
 

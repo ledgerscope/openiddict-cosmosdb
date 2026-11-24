@@ -1,7 +1,9 @@
 using System.Net;
-using System.Text;
 using System.Text.Json.Nodes;
+using Azure.Data.Tables;
 using Ledgerscope.OpenIddict.MigrateAts;
+using Microsoft.Azure.Cosmos;
+using Moq;
 using Xunit;
 
 namespace Ledgerscope.OpenIddict.CosmosDb.Tests;
@@ -9,143 +11,146 @@ namespace Ledgerscope.OpenIddict.CosmosDb.Tests;
 public class MigrateAtsTests
 {
     [Fact]
-    public async Task CliUsesIsolatedIdentitySessionAndCleansItUp()
-    {
-        if (OperatingSystem.IsWindows()) return;
-        var directory = Directory.CreateTempSubdirectory("migration-cli-test-");
-        try
-        {
-            var executable = Path.Combine(directory.FullName, "az");
-            var marker = Path.Combine(directory.FullName, "config-path");
-            await File.WriteAllTextAsync(executable, $$"""
-                #!/bin/sh
-                if [ "$1" = "login" ]; then
-                  [ "$2" = "--identity" ] || exit 1
-                  printf '%s' "$AZURE_CONFIG_DIR" > '{{marker}}'
-                else
-                  printf '{"accessToken":"fake","expires_on":4102444800}'
-                fi
-                """);
-            File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            string config;
-            using (var identity = new AzureCliIdentity(executable))
-            {
-                await identity.LoginAsync();
-                config = await File.ReadAllTextAsync(marker);
-                Assert.True(Directory.Exists(config));
-                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(config));
-                Assert.Equal("fake", await identity.GetTokenAsync("https://storage.azure.com/"));
-            }
-            Assert.False(Directory.Exists(config));
-        }
-        finally
-        {
-            directory.Delete(true);
-        }
-    }
-
-    [Fact]
     public void ConvertsIdsLinksDatesAndJson()
     {
-        var application = Migration.ConvertRow("applications", JsonNode.Parse(
-            """{"PartitionKey":"app","RowKey":"other","Type":"confidential","RedirectUris":"[\"https://example.test/\"]","ClientSecret":"hash"}""")!.AsObject(), 1);
+        var application = Migration.ConvertRow("applications", new TableEntity("app", "other")
+        {
+            ["Type"] = "confidential",
+            ["RedirectUris"] = """["https://example.test/"]""",
+            ["ClientSecret"] = "hash"
+        }, 1);
         Assert.Equal("app", application["id"]!.GetValue<string>());
         Assert.Equal("confidential", application["clientType"]!.GetValue<string>());
         Assert.Equal("hash", application["clientSecret"]!.GetValue<string>());
         Assert.Equal("https://example.test/", application["redirectUris"]![0]!.GetValue<string>());
-        Assert.Null(application["RowKey"]);
+        Assert.Null(application["rowKey"]);
 
-        var token = Migration.ConvertRow("tokens", JsonNode.Parse(
-            """{"PartitionKey":"tok","ApplicationId":"app","AuthorizationId":"auth","ExpirationDate":"2026-01-02T03:04:05.1234567Z","Properties":"{\"nested\":[true,1]}"}""")!.AsObject(), 1);
+        var token = Migration.ConvertRow("tokens", new TableEntity("tok", "x")
+        {
+            ["ApplicationId"] = "app",
+            ["AuthorizationId"] = "auth",
+            ["ExpirationDate"] = "2026-01-02T03:04:05.1234567Z",
+            ["Properties"] = """{"nested":[true,1]}"""
+        }, 1);
         Assert.Equal("auth", token["authorizationId"]!.GetValue<string>());
         Assert.Equal("2026-01-02T03:04:05.1234567Z", token["expirationDate"]!.GetValue<string>());
         Assert.True(token["properties"]!["nested"]![0]!.GetValue<bool>());
     }
 
-    [Theory]
-    [InlineData("""{"PartitionKey":"bad/id"}""")]
-    [InlineData("""{"PartitionKey":"app","CustomSecret":"secret"}""")]
-    [InlineData("""{"PartitionKey":"app","RedirectUris":"[42]"}""")]
-    public void RejectsUnsupportedSourceWithoutLeakingValues(string input)
+    [Fact]
+    public void RejectsUnsupportedSourceWithoutLeakingValues()
     {
-        var ex = Assert.Throws<InvalidOperationException>(() => Migration.ConvertRow("applications", JsonNode.Parse(input)!.AsObject(), 1));
-        Assert.DoesNotContain("secret", ex.Message);
+        var rows = new[]
+        {
+            new TableEntity("bad/id", "r"),
+            new TableEntity("app", "r") { ["CustomSecret"] = "secret" },
+            new TableEntity("app", "r") { ["RedirectUris"] = "[42]" },
+            new TableEntity("app", "r") { ["RedirectUris"] = 42 }
+        };
+        foreach (var row in rows)
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() => Migration.ConvertRow("applications", row, 1));
+            Assert.DoesNotContain("secret", ex.Message);
+        }
     }
 
     [Fact]
-    public async Task DryRunApplyRetryAndConflict()
+    public void ParsesEndpoints()
     {
-        var handler = new MockService();
-        using var http = new HttpClient(handler);
-        var tokens = new List<string>();
-        var migration = new Migration(http, resource => { tokens.Add(resource); return Task.FromResult("fake"); },
-            new Uri("https://source.table.core.windows.net/"), new Uri("https://target.documents.azure.com/dbs/auth"));
-        await migration.RunAsync(false);
-        Assert.Empty(handler.Documents);
-        await migration.RunAsync(true);
-        Assert.Equal(4, handler.Documents.Count);
-        await migration.RunAsync(true);
-        Assert.Equal(4, handler.Documents.Count);
-        handler.Documents["app"]["clientType"] = "public";
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => migration.RunAsync(true));
-        Assert.Contains("destination document differs", ex.Message);
-        Assert.Contains("https://storage.azure.com/", tokens);
-        Assert.Contains("https://cosmos.azure.com/", tokens);
-        Assert.True(handler.SawContinuation);
+        Assert.Equal("auth", Program.ParseCosmosEndpoint("https://target.documents.azure.com/dbs/auth").Database);
+        Assert.Equal("https://target.documents.azure.com/", Program.ParseCosmosEndpoint("https://target.documents.azure.com/dbs/auth/").Account.AbsoluteUri);
+        Program.ParseTableEndpoint("https://source.table.core.windows.net");
+        Assert.Throws<ArgumentException>(() => Program.ParseTableEndpoint("http://source.table.core.windows.net"));
+        Assert.Throws<ArgumentException>(() => Program.ParseTableEndpoint("https://evil.example/"));
+        Assert.Throws<ArgumentException>(() => Program.ParseCosmosEndpoint("https://target.documents.azure.com/"));
     }
 
-    private sealed class MockService : HttpMessageHandler
+    [Fact]
+    public async Task DryRunWritesNothingAndApplyIsRepeatable()
+    {
+        var source = new FakeSource();
+        var store = new FakeStore();
+        var output = new StringWriter();
+        var migration = new Migration(source, store, output);
+
+        await migration.RunAsync(false, default);
+        Assert.Empty(store.Documents);
+        Assert.Contains("Dry run complete", output.ToString());
+
+        await migration.RunAsync(true, default);
+        Assert.Equal(4, store.Documents.Count);
+        await migration.RunAsync(true, default);
+        Assert.Equal(4, store.Documents.Count);
+
+        store.Documents["app"]["clientType"] = "public";
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => migration.RunAsync(true, default));
+        Assert.Contains("differs", ex.Message);
+    }
+
+    [Fact]
+    public async Task StopsWhenSourceChangesBetweenPasses()
+    {
+        var source = new FakeSource { DropTokenAfterFirstRead = true };
+        var migration = new Migration(source, new FakeStore(), TextWriter.Null);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => migration.RunAsync(true, default));
+        Assert.Contains("source changed", ex.Message);
+    }
+
+    [Fact]
+    public async Task CosmosStoreAcceptsIdenticalAndRejectsDifferentConflicts()
+    {
+        var document = new JsonObject { ["id"] = "app", ["clientType"] = "confidential" };
+        var stored = new JsonObject { ["id"] = "app", ["clientType"] = "confidential", ["_etag"] = "x", ["_ts"] = 1 };
+
+        var response = new Mock<ItemResponse<JsonObject>>();
+        response.SetupGet(r => r.Resource).Returns(() => stored.DeepClone().AsObject());
+        var container = new Mock<Container>();
+        container.Setup(c => c.CreateItemAsync(It.IsAny<JsonObject>(), It.IsAny<PartitionKey?>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new CosmosException("conflict", HttpStatusCode.Conflict, 0, "", 0));
+        container.Setup(c => c.ReadItemAsync<JsonObject>("app", new PartitionKey("app"), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(response.Object);
+        var database = new Mock<Database>();
+        database.Setup(d => d.GetContainer("openiddict.applications")).Returns(container.Object);
+        var store = new CosmosDocumentStore(database.Object);
+
+        Assert.False(await store.CreateAsync("applications", document, default));
+        stored["clientType"] = "public";
+        await Assert.ThrowsAsync<InvalidOperationException>(() => store.CreateAsync("applications", document, default));
+        container.Verify(c => c.UpsertItemAsync(It.IsAny<JsonObject>(), It.IsAny<PartitionKey?>(), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    private sealed class FakeSource : IRowSource
+    {
+        private int reads;
+        public bool DropTokenAfterFirstRead { get; init; }
+
+        public async IAsyncEnumerable<TableEntity> ReadAsync(string kind, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            if (kind == "tokens" && DropTokenAfterFirstRead && reads++ > 0) yield break;
+            yield return kind switch
+            {
+                "applications" => new TableEntity("app", "r") { ["Type"] = "confidential" },
+                "scopes" => new TableEntity("scope", "r") { ["Name"] = "test" },
+                "authorizations" => new TableEntity("auth", "r") { ["ApplicationId"] = "app" },
+                _ => new TableEntity("tok", "r") { ["ApplicationId"] = "app", ["AuthorizationId"] = "auth" }
+            };
+        }
+    }
+
+    private sealed class FakeStore : IDocumentStore
     {
         public Dictionary<string, JsonObject> Documents { get; } = new();
-        public bool SawContinuation { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        public Task ValidateContainerAsync(string kind, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<bool> CreateAsync(string kind, JsonObject document, CancellationToken cancellationToken)
         {
-            var uri = request.RequestUri!;
-            if (uri.Host.EndsWith(".table.core.windows.net", StringComparison.Ordinal))
-            {
-                Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
-                if (uri.AbsolutePath == "/OpenIddictApplications()" && uri.Query.Length == 0)
-                {
-                    var first = Response(HttpStatusCode.OK, """{"value":[]}""");
-                    first.Headers.TryAddWithoutValidation("x-ms-continuation-NextPartitionKey", "a+==");
-                    return Task.FromResult(first);
-                }
-                if (uri.AbsolutePath == "/OpenIddictApplications()")
-                {
-                    Assert.Equal("?NextPartitionKey=a%2B%3D%3D", uri.Query);
-                    SawContinuation = true;
-                }
-                var row = uri.AbsolutePath switch
-                {
-                    "/OpenIddictApplications()" => """{"PartitionKey":"app","Type":"confidential"}""",
-                    "/OpenIddictScopes()" => """{"PartitionKey":"scope","Name":"test"}""",
-                    "/OpenIddictAuthorizations()" => """{"PartitionKey":"auth","ApplicationId":"app"}""",
-                    "/OpenIddictTokens()" => """{"PartitionKey":"tok","ApplicationId":"app","AuthorizationId":"auth"}""",
-                    _ => throw new InvalidOperationException("Unexpected table request.")
-                };
-                return Task.FromResult(Response(HttpStatusCode.OK, $$"""{"value":[{{row}}]}"""));
-            }
-            Assert.Equal("type%3Daad%26ver%3D1.0%26sig%3Dfake", request.Headers.GetValues("Authorization").Single());
-            if (request.Method == HttpMethod.Get && !uri.AbsolutePath.Contains("/docs", StringComparison.Ordinal))
-                return Task.FromResult(Response(HttpStatusCode.OK, """{"partitionKey":{"paths":["/id"]}}"""));
-            if (request.Method == HttpMethod.Post)
-            {
-                var doc = JsonNode.Parse(request.Content!.ReadAsStringAsync(cancellationToken).GetAwaiter().GetResult())!.AsObject();
-                var id = doc["id"]!.GetValue<string>();
-                Assert.Equal($"[\"{id}\"]", request.Headers.GetValues("x-ms-documentdb-partitionkey").Single());
-                if (!Documents.TryAdd(id, doc)) return Task.FromResult(Response(HttpStatusCode.Conflict, ""));
-                return Task.FromResult(Response(HttpStatusCode.Created, ""));
-            }
-            var key = Uri.UnescapeDataString(uri.Segments[^1]);
-            var existing = Documents[key].DeepClone().AsObject();
-            existing["_etag"] = "test";
-            return Task.FromResult(Response(HttpStatusCode.OK, existing.ToJsonString()));
+            var id = document["id"]!.GetValue<string>();
+            if (Documents.TryAdd(id, document)) return Task.FromResult(true);
+            return JsonNode.DeepEquals(Documents[id], document)
+                ? Task.FromResult(false)
+                : throw new InvalidOperationException($"{kind}: destination document differs from the source.");
         }
-
-        private static HttpResponseMessage Response(HttpStatusCode status, string body) => new(status)
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json")
-        };
     }
 }
