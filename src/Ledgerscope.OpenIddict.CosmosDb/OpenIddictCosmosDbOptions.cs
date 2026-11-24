@@ -14,14 +14,14 @@ namespace Ledgerscope.OpenIddict.CosmosDb;
 public sealed class OpenIddictCosmosDbOptions
 {
     /// <summary>
-    /// Gets or sets the name of the applications container (by default, openiddict.applications).
+    /// Gets or sets the name of the applications container (by default, OpenIddictApplications).
     /// </summary>
-    public string ApplicationsContainerName { get; set; } = "openiddict.applications";
+    public string ApplicationsContainerName { get; set; } = "OpenIddictApplications";
 
     /// <summary>
-    /// Gets or sets the name of the authorizations container (by default, openiddict.authorizations).
+    /// Gets or sets the name of the authorizations container (by default, OpenIddictAuthorizations).
     /// </summary>
-    public string AuthorizationsContainerName { get; set; } = "openiddict.authorizations";
+    public string AuthorizationsContainerName { get; set; } = "OpenIddictAuthorizations";
 
     /// <summary>
     /// Gets or sets the <see cref="Microsoft.Azure.Cosmos.Database"/> used by the OpenIddict stores.
@@ -30,12 +30,12 @@ public sealed class OpenIddictCosmosDbOptions
     public Database? Database { get; set; }
 
     /// <summary>
-    /// Gets or sets the name of the scopes container (by default, openiddict.scopes).
+    /// Gets or sets the name of the scopes container (by default, OpenIddictScopes).
     /// </summary>
-    public string ScopesContainerName { get; set; } = "openiddict.scopes";
+    public string ScopesContainerName { get; set; } = "OpenIddictScopes";
 
     /// <summary>
-    /// Gets or sets the name of the tokens container (by default, openiddict.tokens).
+    /// Gets or sets the name of the tokens container (by default, OpenIddictTokens).
     /// </summary>
-    public string TokensContainerName { get; set; } = "openiddict.tokens";
+    public string TokensContainerName { get; set; } = "OpenIddictTokens";
 }

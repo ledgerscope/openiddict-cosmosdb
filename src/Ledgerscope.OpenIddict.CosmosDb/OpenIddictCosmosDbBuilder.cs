@@ -126,7 +126,7 @@ public sealed class OpenIddictCosmosDbBuilder
     }
 
     /// <summary>
-    /// Replaces the default applications container name (by default, openiddict.applications).
+    /// Replaces the default applications container name (by default, OpenIddictApplications).
     /// </summary>
     /// <param name="name">The container name.</param>
     /// <returns>The <see cref="OpenIddictCosmosDbBuilder"/> instance.</returns>
@@ -138,7 +138,7 @@ public sealed class OpenIddictCosmosDbBuilder
     }
 
     /// <summary>
-    /// Replaces the default authorizations container name (by default, openiddict.authorizations).
+    /// Replaces the default authorizations container name (by default, OpenIddictAuthorizations).
     /// </summary>
     /// <param name="name">The container name.</param>
     /// <returns>The <see cref="OpenIddictCosmosDbBuilder"/> instance.</returns>
@@ -150,7 +150,7 @@ public sealed class OpenIddictCosmosDbBuilder
     }
 
     /// <summary>
-    /// Replaces the default scopes container name (by default, openiddict.scopes).
+    /// Replaces the default scopes container name (by default, OpenIddictScopes).
     /// </summary>
     /// <param name="name">The container name.</param>
     /// <returns>The <see cref="OpenIddictCosmosDbBuilder"/> instance.</returns>
@@ -162,7 +162,7 @@ public sealed class OpenIddictCosmosDbBuilder
     }
 
     /// <summary>
-    /// Replaces the default tokens container name (by default, openiddict.tokens).
+    /// Replaces the default tokens container name (by default, OpenIddictTokens).
     /// </summary>
     /// <param name="name">The container name.</param>
     /// <returns>The <see cref="OpenIddictCosmosDbBuilder"/> instance.</returns>

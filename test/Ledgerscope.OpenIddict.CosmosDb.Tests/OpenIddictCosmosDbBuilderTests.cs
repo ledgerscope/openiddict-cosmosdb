@@ -15,6 +15,20 @@ namespace Ledgerscope.OpenIddict.CosmosDb.Tests;
 public class OpenIddictCosmosDbBuilderTests
 {
     [Fact]
+    public void UseCosmosDb_UsesDefaultContainerNames()
+    {
+        var services = CreateServices();
+        CreateBuilder(services);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<OpenIddictCosmosDbOptions>>().CurrentValue;
+
+        Assert.Equal("OpenIddictApplications", options.ApplicationsContainerName);
+        Assert.Equal("OpenIddictAuthorizations", options.AuthorizationsContainerName);
+        Assert.Equal("OpenIddictScopes", options.ScopesContainerName);
+        Assert.Equal("OpenIddictTokens", options.TokensContainerName);
+    }
+
+    [Fact]
     public void Constructor_ThrowsAnExceptionForNullServices()
     {
         // Arrange
