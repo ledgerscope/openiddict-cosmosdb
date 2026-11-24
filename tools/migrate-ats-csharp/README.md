@@ -16,9 +16,7 @@ Give the identity **Storage Table Data Reader** on the source storage account an
 
 ## Tables and containers
 
-The tool reads the ATS provider's default tables: `OpenIddictApplications`, `OpenIddictScopes`, `OpenIddictAuthorizations` and `OpenIddictTokens`. In the target database, use Cosmos DB for NoSQL containers named `openiddictapplications`, `openiddictscopes`, `openiddictauthorizations` and `openiddicttokens`, each partitioned on `/id` with TTL disabled. The tool checks this before copying.
-
-The Cosmos provider's default container names contain dots, so configure its `SetApplicationsContainerName`, `SetScopesContainerName`, `SetAuthorizationsContainerName` and `SetTokensContainerName` options to match these dotless names before using the migrated data.
+The tool reads the ATS provider's default tables: `OpenIddictApplications`, `OpenIddictScopes`, `OpenIddictAuthorizations` and `OpenIddictTokens`. In the target database, use the Cosmos provider's default containers with the same names, each partitioned on `/id` with TTL disabled. Names are case-sensitive. The tool checks the container configuration before copying and does not support custom container names.
 
 ## Cutover steps
 

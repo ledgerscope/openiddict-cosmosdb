@@ -66,11 +66,11 @@ public class MigrateAtsTests
     }
 
     [Theory]
-    [InlineData("applications", "openiddictapplications")]
-    [InlineData("scopes", "openiddictscopes")]
-    [InlineData("authorizations", "openiddictauthorizations")]
-    [InlineData("tokens", "openiddicttokens")]
-    public void UsesDotlessContainerNames(string kind, string expected)
+    [InlineData("applications", "OpenIddictApplications")]
+    [InlineData("scopes", "OpenIddictScopes")]
+    [InlineData("authorizations", "OpenIddictAuthorizations")]
+    [InlineData("tokens", "OpenIddictTokens")]
+    public void UsesDefaultContainerNames(string kind, string expected)
     {
         Assert.Equal(expected, Migration.ContainerName(kind));
     }
@@ -120,7 +120,7 @@ public class MigrateAtsTests
         container.Setup(c => c.ReadItemAsync<JsonObject>("app", new PartitionKey("app"), It.IsAny<ItemRequestOptions>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(response.Object);
         var database = new Mock<Database>();
-        database.Setup(d => d.GetContainer("openiddictapplications")).Returns(container.Object);
+        database.Setup(d => d.GetContainer("OpenIddictApplications")).Returns(container.Object);
         var store = new CosmosDocumentStore(database.Object);
 
         Assert.False(await store.CreateAsync("applications", document, default));

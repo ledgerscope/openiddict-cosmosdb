@@ -31,12 +31,14 @@ The stores don't create containers. Create one container per entity type, **part
 
 | Entity | Default container name | Rename with |
 | --- | --- | --- |
-| Applications | `openiddict.applications` | `SetApplicationsContainerName()` |
-| Authorizations | `openiddict.authorizations` | `SetAuthorizationsContainerName()` |
-| Scopes | `openiddict.scopes` | `SetScopesContainerName()` |
-| Tokens | `openiddict.tokens` | `SetTokensContainerName()` |
+| Applications | `OpenIddictApplications` | `SetApplicationsContainerName()` |
+| Authorizations | `OpenIddictAuthorizations` | `SetAuthorizationsContainerName()` |
+| Scopes | `OpenIddictScopes` | `SetScopesContainerName()` |
+| Tokens | `OpenIddictTokens` | `SetTokensContainerName()` |
 
 The default indexing policy (index all paths) is sufficient.
+
+Existing deployments using the previous dotted defaults must explicitly configure those names with the methods above when upgrading. Explicit overrides, including singular names, continue to take precedence over the new defaults. Container names are case-sensitive; the provider does not rename containers or move data.
 
 ## Migrating from Azure Table Storage
 

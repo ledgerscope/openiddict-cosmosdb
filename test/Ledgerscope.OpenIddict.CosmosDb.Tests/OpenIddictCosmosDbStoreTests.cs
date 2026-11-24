@@ -15,10 +15,10 @@ namespace Ledgerscope.OpenIddict.CosmosDb.Tests;
 
 public class OpenIddictCosmosDbStoreTests
 {
-    private const string Applications = "openiddict.applications";
-    private const string Authorizations = "openiddict.authorizations";
-    private const string Scopes = "openiddict.scopes";
-    private const string Tokens = "openiddict.tokens";
+    private const string Applications = "OpenIddictApplications";
+    private const string Authorizations = "OpenIddictAuthorizations";
+    private const string Scopes = "OpenIddictScopes";
+    private const string Tokens = "OpenIddictTokens";
 
     [Fact]
     public async Task CreateAsync_PersistsCamelCasedDocumentPartitionedByIdentifier()

@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Azure.Data.Tables;
+using Ledgerscope.OpenIddict.CosmosDb;
 
 namespace Ledgerscope.OpenIddict.MigrateAts;
 
@@ -21,10 +22,18 @@ internal sealed partial class Migration(IRowSource source, IDocumentStore destin
     private static readonly HashSet<string> Maps = ["Descriptions", "DisplayNames"];
     private static readonly HashSet<string> Dates = ["CreationDate", "ExpirationDate", "RedemptionDate"];
     private static readonly HashSet<string> Metadata = ["PartitionKey", "RowKey", "Timestamp", "ConcurrencyToken"];
+    private static readonly OpenIddictCosmosDbOptions DefaultOptions = new();
 
     public static string TableName(string kind) => "OpenIddict" + char.ToUpperInvariant(kind[0]) + kind[1..];
 
-    public static string ContainerName(string kind) => "openiddict" + kind;
+    public static string ContainerName(string kind) => kind switch
+    {
+        "applications" => DefaultOptions.ApplicationsContainerName,
+        "authorizations" => DefaultOptions.AuthorizationsContainerName,
+        "scopes" => DefaultOptions.ScopesContainerName,
+        "tokens" => DefaultOptions.TokensContainerName,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    };
 
     public async Task RunAsync(bool apply, CancellationToken cancellationToken)
     {
