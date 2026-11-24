@@ -1,9 +1,8 @@
 # Migrate OpenIddict from Azure Table Storage to Cosmos DB for NoSQL
 
-Run on an Azure host with a system-assigned managed identity, PowerShell 7.6+, and `Az.Accounts` 5.0+. The script uses `Connect-AzAccount -Identity`; it does not accept connection strings, keys, or login details.
+Run on an Azure host with a system-assigned managed identity, PowerShell 7.6+, and Azure CLI 2.54.0 or later. The script uses `az login --identity`; it does not accept connection strings, keys, or login details. It creates a temporary private Azure CLI configuration directory, removes it on exit, and leaves your existing Azure CLI session unchanged. Ensure the temporary directory is private to the executing user, especially on Windows.
 
 ```powershell
-Install-Module Az.Accounts -MinimumVersion 5.0 -Scope CurrentUser # If not already installed
 ./tools/migrate-ats/Migrate-OpenIddict.ps1 `
     -TableEndpoint https://sourcestorage.table.core.windows.net `
     -CosmosDatabaseEndpoint https://destination.documents.azure.com/dbs/auth

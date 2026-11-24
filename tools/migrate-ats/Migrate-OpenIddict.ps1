@@ -39,8 +39,16 @@ function Invoke-DataRequest($Method, $Uri, $Service, $Operation, $Document, [str
     for ($attempt = 0; ; $attempt++) {
         if (!$tokens.ContainsKey($resource) -or $tokens[$resource].ExpiresOn -lt [DateTimeOffset]::UtcNow.AddMinutes(5)) {
             try {
-                $tokens[$resource] = Get-AzAccessToken -ResourceUrl $resource -DefaultProfile $identity `
-                    -AsSecureString -ErrorAction Stop -Verbose:$false -Debug:$false
+                $result = & az account get-access-token --resource $resource --output json --only-show-errors 2>$null
+                if ($LASTEXITCODE -ne 0) { throw 'Azure CLI token request failed.' }
+                $responseToken = $result | ConvertFrom-Json -AsHashtable
+                if ([string]::IsNullOrWhiteSpace($responseToken['accessToken'])) { throw 'Missing access token.' }
+                $expiration = [DateTimeOffset]::FromUnixTimeSeconds([long] $responseToken['expires_on'])
+                if ($expiration -le [DateTimeOffset]::UtcNow.AddMinutes(5)) { throw 'Token is expired or near expiry.' }
+                $tokens[$resource] = @{
+                    Token = ConvertTo-SecureString $responseToken['accessToken'] -AsPlainText -Force
+                    ExpiresOn = $expiration
+                }
             } catch {
                 throw "Could not obtain a managed identity token for $Service."
             }
@@ -159,12 +167,22 @@ function Convert-Row($Kind, [System.Text.Json.Nodes.JsonObject] $Row, $Number) {
     Write-Output -NoEnumerate $doc
 }
 
+$originalConfigDir = $env:AZURE_CONFIG_DIR
+$configDir = Join-Path ([IO.Path]::GetTempPath()) ("openiddict-migration-" + [guid]::NewGuid().ToString('N'))
 try {
-    $identity = Connect-AzAccount -Identity -SkipContextPopulation -Scope Process -ErrorAction Stop
-    if ($null -eq $identity.Context) { throw 'No identity context.' }
-} catch {
-    throw 'Could not sign in with the system-assigned managed identity. Run on a supported Azure host with Az.Accounts installed.'
-}
+    if ($IsWindows) {
+        [void] [IO.Directory]::CreateDirectory($configDir)
+    } else {
+        [void] [IO.Directory]::CreateDirectory($configDir, [IO.UnixFileMode]::UserRead -bor
+            [IO.UnixFileMode]::UserWrite -bor [IO.UnixFileMode]::UserExecute)
+    }
+    $env:AZURE_CONFIG_DIR = $configDir
+    try {
+        & az login --identity --allow-no-subscriptions --output none --only-show-errors 2>$null
+        if ($LASTEXITCODE -ne 0) { throw 'Azure CLI login failed.' }
+    } catch {
+        throw 'Could not sign in with the system-assigned managed identity. Run on a supported Azure host with Azure CLI installed.'
+    }
 $tokens = @{}
 $database = $CosmosDatabaseEndpoint.AbsoluteUri.TrimEnd('/')
 $ids = @{}
@@ -220,4 +238,10 @@ foreach ($kind in $fields.Keys) {
     }
     if ($ids[$kind].Count) { throw "${kind}: source IDs changed after validation." }
     Write-Host "${kind}: $created created, $existing already identical"
+}
+} finally {
+    $env:AZURE_CONFIG_DIR = $originalConfigDir
+    if (Test-Path -LiteralPath $configDir) {
+        Remove-Item -LiteralPath $configDir -Recurse -Force
+    }
 }

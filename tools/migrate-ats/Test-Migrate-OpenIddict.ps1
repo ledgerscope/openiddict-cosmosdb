@@ -10,19 +10,27 @@ $testState = @{
     Documents = @{}
     Requests = [Collections.Generic.List[string]]::new()
     Audiences = [Collections.Generic.List[string]]::new()
+    ConfigDirs = [Collections.Generic.List[string]]::new()
+    FailLogin = $false
+    FailToken = $false
+    ExpiredToken = $false
 }
 
-function Connect-AzAccount([switch] $Identity, [switch] $SkipContextPopulation, $Scope) {
-    Assert ($Identity -and $SkipContextPopulation -and $Scope -eq 'Process') 'Expected managed identity sign-in.'
-    @{ Context = 'test-context' }
-}
-
-function Get-AzAccessToken {
-    [CmdletBinding()]
-    param($ResourceUrl, $DefaultProfile, [switch] $AsSecureString)
-    Assert ($DefaultProfile.Context -eq 'test-context' -and $AsSecureString) 'Expected a secure token from the managed identity profile.'
-    $testState.Audiences.Add($ResourceUrl)
-    @{ Token = (ConvertTo-SecureString 'fake-token' -AsPlainText -Force); ExpiresOn = [DateTimeOffset]::UtcNow.AddHours(1) }
+function az {
+    $global:LASTEXITCODE = 0
+    if ($args[0] -eq 'login') {
+        Assert (($args -join ' ') -ceq 'login --identity --allow-no-subscriptions --output none --only-show-errors') 'Expected system-assigned managed identity sign-in.'
+        Assert (Test-Path -LiteralPath $env:AZURE_CONFIG_DIR) 'Expected isolated CLI configuration directory.'
+        $testState.ConfigDirs.Add($env:AZURE_CONFIG_DIR)
+        if ($testState.FailLogin) { $global:LASTEXITCODE = 1 }
+        return
+    }
+    Assert ($args[0] -eq 'account' -and $args[1] -eq 'get-access-token' -and $args[2] -eq '--resource' -and
+        ($args[4..6] -join ' ') -ceq '--output json --only-show-errors') 'Expected resource-specific CLI token request.'
+    $testState.Audiences.Add($args[3])
+    if ($testState.FailToken) { $global:LASTEXITCODE = 1; return }
+    $expiration = if ($testState.ExpiredToken) { 0 } else { [DateTimeOffset]::UtcNow.AddHours(1).ToUnixTimeSeconds() }
+    @{ accessToken = 'fake-token'; expires_on = $expiration } | ConvertTo-Json -Compress
 }
 
 function Invoke-WebRequest {
@@ -76,7 +84,9 @@ $endpoints = @{
     CosmosDatabaseEndpoint = 'https://testdest.documents.azure.com/dbs/authdata'
 }
 
+$env:AZURE_CONFIG_DIR = 'original-test-session'
 & $migration @endpoints
+Assert ($env:AZURE_CONFIG_DIR -ceq 'original-test-session' -and !(Test-Path -LiteralPath $testState.ConfigDirs[0])) 'CLI session was not restored or temporary configuration not removed.'
 Assert (!($testState.Requests -match '^POST ')) 'Dry run must not write.'
 Assert (($testState.Audiences -join ',') -ceq 'https://cosmos.azure.com/,https://storage.azure.com/') 'Expected separate managed identity audiences.'
 
@@ -96,5 +106,17 @@ try {
     throw 'Expected a conflicting item to stop the migration.'
 } catch {
     Assert ($_.Exception.Message -like '*destination document differs*') "Unexpected failure: $_"
+}
+foreach ($failure in 'FailLogin', 'FailToken', 'ExpiredToken') {
+    $testState[$failure] = $true
+    try {
+        & $migration @endpoints
+        throw "Expected $failure to stop the migration."
+    } catch {
+        Assert ($_.Exception.Message -like '*managed identity*') "Unexpected failure: $_"
+        Assert ($env:AZURE_CONFIG_DIR -ceq 'original-test-session' -and
+            !(Test-Path -LiteralPath $testState.ConfigDirs[-1])) 'CLI configuration was not cleaned up after failure.'
+    }
+    $testState[$failure] = $false
 }
 Write-Host 'Migration checks passed.'
