@@ -24,7 +24,7 @@ internal sealed partial class Migration(IRowSource source, IDocumentStore destin
 
     public static string TableName(string kind) => "OpenIddict" + char.ToUpperInvariant(kind[0]) + kind[1..];
 
-    public static string ContainerName(string kind) => "openiddict." + kind;
+    public static string ContainerName(string kind) => "openiddict" + kind;
 
     public async Task RunAsync(bool apply, CancellationToken cancellationToken)
     {
