@@ -71,6 +71,37 @@ dotnet test
 The unit tests use mocked containers and need no database. Two integration tests run against a real Cosmos DB account
 or emulator when `OPENIDDICT_COSMOSDB_CONNECTION_STRING` is set; each run creates and deletes a temporary database.
 
+## Continuous integration and releases
+
+The [build workflow](.github/workflows/build.yml) has two jobs:
+
+1. **Test and pack** runs on every push to any branch and on pull requests to `main`: it builds, runs the
+   tests and packs both packages, uploading the test results and packages as workflow artifacts.
+2. **Publish to GitHub Packages** runs only after the tests pass, on pushes (not pull requests), and pushes
+   the packages to `https://nuget.pkg.github.com/ledgerscope/index.json`.
+
+| Trigger | Package version | Example |
+| --- | --- | --- |
+| Push to `main` | `{major}.{minor}.{run number}` | `1.0.42` |
+| Push to another branch | `{major}.{minor}.{run number}-{branch}` (pre-release) | `1.0.43-feature-cosmos-ttl` |
+
+The major and minor versions come from `VersionPrefix` in `Directory.Build.props`; change it to `1.1.0` to start
+producing `1.1.x` versions. In branch versions, characters that NuGet doesn't allow (such as `/` and `_`) become `-`.
+Run numbers are shared by all branches, so every build gets a unique version.
+
+To run the integration tests in CI, add a `OPENIDDICT_COSMOSDB_CONNECTION_STRING` repository secret pointing
+at an account dedicated to testing.
+
+### Consuming the packages
+
+GitHub Packages requires authentication, even to restore. Add the feed with a token that has the
+`read:packages` scope (in GitHub Actions, the `GITHUB_TOKEN` works for repositories in the organization
+once they're granted access to the package):
+
+```bash
+dotnet nuget add source https://nuget.pkg.github.com/ledgerscope/index.json --name ledgerscope --username <github user> --password <token> --store-password-in-clear-text
+```
+
 ## License
 
 Apache License 2.0. This project is derived from OpenIddict; see [NOTICE.md](NOTICE.md).
