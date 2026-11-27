@@ -107,7 +107,7 @@ internal sealed partial class Migration(IRowSource source, IDocumentStore destin
             try
             {
                 var name = kind == "applications" && field == "Type" ? "clientType" : char.ToLowerInvariant(field[0]) + field[1..];
-                document[name] = ConvertValue(field, row.GetString(field));
+                document[name] = ConvertValue(field, raw);
             }
             catch (Exception ex) when (ex is InvalidCastException or FormatException or JsonException)
             {
@@ -117,17 +117,22 @@ internal sealed partial class Migration(IRowSource source, IDocumentStore destin
         return document;
     }
 
-    private static JsonNode? ConvertValue(string field, string text)
+    private static JsonNode? ConvertValue(string field, object raw)
     {
         if (Dates.Contains(field))
         {
-            // Preserve the stored 7-digit precision; DateTimeOffset round-trips it exactly.
-            if (!text.EndsWith('Z') || !DateTimeOffset.TryParseExact(text, "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK",
-                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            DateTimeOffset date;
+            if (raw is DateTimeOffset typedDate)
+                date = typedDate;
+            else if (raw is not string dateText || !dateText.EndsWith('Z') ||
+                     !DateTimeOffset.TryParseExact(dateText, "yyyy-MM-dd'T'HH:mm:ss.FFFFFFFK",
+                         CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
                 throw new FormatException();
+
             return date.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff'Z'", CultureInfo.InvariantCulture);
         }
 
+        if (raw is not string text) throw new FormatException();
         if (!Arrays.Contains(field) && !Maps.Contains(field) && field != "Properties") return text;
 
         var value = JsonNode.Parse(text);

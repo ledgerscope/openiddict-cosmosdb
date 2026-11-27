@@ -6,7 +6,7 @@ A .NET 10 console tool that copies applications, scopes, authorizations and toke
 dotnet run --project tools/migrate-ats-csharp -- https://sourcestorage.table.core.windows.net https://destination.documents.azure.com/dbs/auth
 ```
 
-Only the two endpoints are required. Append `--apply` to create documents after validation; without it the tool is read-only. To debug, open `MigrateAts.csproj` in your IDE and pass the same arguments in the debugger.
+Only the two endpoints are required. Append `--apply` to create documents after validation; without it the tool is read-only. To debug in Visual Studio, open `Ledgerscope.OpenIddict.CosmosDb.slnx`, set `MigrateAts` as the startup project, and pass the same arguments in the debugger.
 
 The Cosmos endpoint includes `/dbs/<database>` so the tool does not have to guess which database to write to. Use standard Azure public-cloud service addresses, even if they resolve through private networking.
 
@@ -27,4 +27,4 @@ The tool reads the ATS provider's default tables: `OpenIddictApplications`, `Ope
 
 ## Mapping
 
-The ATS `PartitionKey` becomes the Cosmos `id`. References, payloads and the stored `ClientSecret` are preserved, JSON columns are stored as JSON, and application `Type` maps to `clientType`. ATS concurrency tokens are not copied; Cosmos issues new `_etag` values. Only the four OpenIddict tables are copied. The tool does not upgrade app configuration or migrate keys or external credential stores. Check that the upgraded application can still validate client credentials and decrypt legacy tokens before cutover.
+The ATS `PartitionKey` becomes the Cosmos `id`. References, payloads and the stored `ClientSecret` are preserved, JSON columns are stored as JSON, and application `Type` maps to `clientType`. Native Table Storage date values and UTC date strings are written as UTC timestamps with seven fractional digits. ATS concurrency tokens are not copied; Cosmos issues new `_etag` values. Only the four OpenIddict tables are copied. The tool does not upgrade app configuration or migrate keys or external credential stores. Check that the upgraded application can still validate client credentials and decrypt legacy tokens before cutover.

@@ -37,6 +37,44 @@ public class MigrateAtsTests
         Assert.True(token["properties"]!["nested"]![0]!.GetValue<bool>());
     }
 
+    [Theory]
+    [InlineData("authorizations", "CreationDate", "creationDate")]
+    [InlineData("tokens", "CreationDate", "creationDate")]
+    [InlineData("tokens", "ExpirationDate", "expirationDate")]
+    [InlineData("tokens", "RedemptionDate", "redemptionDate")]
+    public void ConvertsTypedDatesToUtcWithFullPrecision(string kind, string field, string property)
+    {
+        var date = new DateTimeOffset(2026, 1, 2, 5, 4, 5, TimeSpan.FromHours(2)).AddTicks(1234567);
+        var row = new TableEntity("id", "r") { [field] = date };
+
+        var document = Migration.ConvertRow(kind, row, 1);
+
+        Assert.Equal("2026-01-02T03:04:05.1234567Z", document[property]!.GetValue<string>());
+    }
+
+    [Theory]
+    [InlineData("not-a-date")]
+    [InlineData("2026-01-02T03:04:05+00:00")]
+    public void RejectsInvalidDateStringsWithoutLeakingValues(string value)
+    {
+        var row = new TableEntity("id", "r") { ["CreationDate"] = value };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Migration.ConvertRow("authorizations", row, 7));
+
+        Assert.Equal("authorizations, source row 7: invalid CreationDate.", ex.Message);
+        Assert.DoesNotContain(value, ex.Message);
+    }
+
+    [Fact]
+    public void RejectsInvalidDateTypes()
+    {
+        var row = new TableEntity("id", "r") { ["ExpirationDate"] = 42 };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => Migration.ConvertRow("tokens", row, 2));
+
+        Assert.Equal("tokens, source row 2: invalid ExpirationDate.", ex.Message);
+    }
+
     [Fact]
     public void RejectsUnsupportedSourceWithoutLeakingValues()
     {

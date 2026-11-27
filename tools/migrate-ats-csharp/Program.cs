@@ -40,7 +40,7 @@ internal static partial class Program
                 new TableRowSource(new TableServiceClient(tableEndpoint, credential)),
                 new CosmosDocumentStore(cosmos.GetDatabase(databaseName)),
                 Console.Out);
-            await migration.RunAsync(apply: args.Length == 3, cancellation.Token);
+            await migration.RunAsync(apply: args.Length == 2, cancellation.Token);
             return 0;
         }
         catch (OperationCanceledException)
