@@ -40,6 +40,10 @@ The default indexing policy (index all paths) is sufficient.
 
 Existing deployments using the previous dotted defaults must explicitly configure those names with the methods above when upgrading. Explicit overrides, including singular names, continue to take precedence over the new defaults. Container names are case-sensitive; the provider does not rename containers or move data.
 
+## Migrating from Azure Table Storage
+
+The [ATS migration tool](tools/migrate-ats-csharp/README.md) copies applications, scopes, authorizations and tokens from [ledgerscope/openiddict-ats](https://github.com/ledgerscope/openiddict-ats) to the containers above. It validates without writing by default.
+
 ## Design notes
 
 - **Serialization**: documents are always read and written through the SDK's stream APIs using System.Text.Json with
